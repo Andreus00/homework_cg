@@ -8,9 +8,9 @@
 # ./bin/yraytrace --scene tests/03_texture/texture.json --output out/lowres/03_texture_720_256.jpg --samples 256 --resolution 720
 
 # ./bin/yraytrace --scene tests/04_envlight/envlight.json --output out/lowres/04_envlight_720_256.jpg --samples 256 --resolution 720
-./bin/yraytrace --scene tests/05_arealight/arealight.json --output out/lowres/05_arealight_720_256.jpg --samples 256 --resolution 720
+# ./bin/yraytrace --scene tests/05_arealight/arealight.json --output out/lowres/05_arealight_720_256.jpg --samples 256 --resolution 720
 # ./bin/yraytrace --scene tests/06_metal/metal.json --output out/lowres/06_metal_720_256.jpg --samples 256 --resolution 720
-# ./bin/yraytrace --scene tests/07_plastic/plastic.json --output out/lowres/07_plastic_720_256.jpg --samples 256 --resolution 720
+./bin/yraytrace --scene tests/07_plastic/plastic.json --output out/lowres/07_plastic_720_256.jpg --samples 256 --resolution 720
 # ./bin/yraytrace --scene tests/08_glass/glass.json --output out/lowres/08_glass_720_256.jpg --samples 256 --bounces  8 --resolution 720
 # ./bin/yraytrace --scene tests/09_opacity/opacity.json --output out/lowres/09_opacity_720_256.jpg --samples 256 --resolution 720
 # ./bin/yraytrace --scene tests/10_hair/hair.json --output out/lowres/10_hair_720_256.jpg --samples 256 --resolution 720

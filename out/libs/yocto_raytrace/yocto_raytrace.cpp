@@ -158,6 +158,23 @@ static vec4f shade_raytrace(const scene_data& scene, const bvh_scene& bvh,
         break;
       }
       case material_type::glossy: {  // rough plastic
+        auto test     = fresnel_schlick(color_texture, normal, ray.o);
+        auto incoming = sample_hemisphere(normal, rand2f(rng));
+        auto halfway  = normalize(ray.o + incoming);
+        radiance +=
+            (2 * pi) *
+            (color_texture / pi *
+                    (1 - fresnel_schlick(color_texture, halfway, ray.o)) +
+                fresnel_schlick(color_texture, halfway, ray.o) *
+                    microfacet_distribution(
+                        material.roughness, normal, halfway) *
+                    microfacet_shadowing(
+                        material.roughness, normal, halfway, ray.o, incoming) /
+                    (4 * dot(normal, ray.o) * dot(normal, incoming))) *
+            rgba_to_rgb(shade_raytrace(scene, bvh, ray3f{position, incoming},
+                bounce + 1, rng, params)) *
+            dot(normal, incoming);
+        break;
       }
       case material_type::transparent: {  // polished dielectrics
         auto ks = 0.04f;
