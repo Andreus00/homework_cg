@@ -155,22 +155,35 @@ static vec4f shade_raytrace(const scene_data& scene, const bvh_scene& bvh,
         break;
       }
       case material_type::glossy: {  // rough plastic
-        auto test = fresnel_schlick(color_texture, normal, ray.o);
+        auto exponent = 2 / pow((float)material.roughness, (int)4);
+        auto halfway  = sample_hemisphere_cospower(
+             exponent, normal, rand2f(rng));
         if (rand1f(rng) <
-            fresnel_schlick(color_texture, normal, ray.o).x) {  // matte
+            fresnel_schlick({0.04, 0.04, 0.04}, halfway, ray.o).x) {
+          auto incoming = reflect(ray.o, halfway);
+          radiance += rgba_to_rgb(shade_raytrace(
+              scene, bvh, ray3f{position, incoming}, bounce + 1, rng, params));
+        } else {
           auto incoming = sample_hemisphere_cos(normal, rand2f(rng));
           radiance += color_texture *
                       rgba_to_rgb(shade_raytrace(scene, bvh,
                           ray3f{position, incoming}, bounce + 1, rng, params));
-        } else {
-          auto incoming = reflect(ray.o, normal);
-          radiance += rgba_to_rgb(shade_raytrace(
-              scene, bvh, ray3f{position, incoming}, bounce + 1, rng, params));
         }
         break;
       }
       case material_type::transparent: {  // polished dielectrics
-        auto ks = 0.04f;
+        auto test = fresnel_schlick({0.04, 0.04, 0.04}, normal, ray.o);
+        if (rand1f(rng) < test.x) {
+          auto incoming = reflect(ray.o, normal);
+          radiance += rgba_to_rgb(shade_raytrace(
+              scene, bvh, ray3f{position, incoming}, bounce + 1, rng, params));
+        } else {
+          auto incoming = -ray.o;
+          radiance += color_texture *
+                      rgba_to_rgb(shade_raytrace(scene, bvh,
+                          ray3f{position, incoming}, bounce + 1, rng, params));
+        }
+        break;
       }
     }
     return rgb_to_rgba(radiance);
