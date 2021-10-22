@@ -116,9 +116,6 @@ static vec4f shade_raytrace(const scene_data& scene, const bvh_scene& bvh,
       color_texture *= rgba_to_rgb(eval_texture(
           scene.textures[material.roughness_tex], textcoord, true));
 
-    // environment ?
-    // auto environment_texture = eval_environment(scene, ray);
-
     //////////////////////////
     //
     // handle opacity
@@ -158,22 +155,18 @@ static vec4f shade_raytrace(const scene_data& scene, const bvh_scene& bvh,
         break;
       }
       case material_type::glossy: {  // rough plastic
-        auto test     = fresnel_schlick(color_texture, normal, ray.o);
-        auto incoming = sample_hemisphere(normal, rand2f(rng));
-        auto halfway  = normalize(ray.o + incoming);
-        radiance +=
-            (2 * pi) *
-            (color_texture / pi *
-                    (1 - fresnel_schlick(color_texture, halfway, ray.o)) +
-                fresnel_schlick(color_texture, halfway, ray.o) *
-                    microfacet_distribution(
-                        material.roughness, normal, halfway) *
-                    microfacet_shadowing(
-                        material.roughness, normal, halfway, ray.o, incoming) /
-                    (4 * dot(normal, ray.o) * dot(normal, incoming))) *
-            rgba_to_rgb(shade_raytrace(scene, bvh, ray3f{position, incoming},
-                bounce + 1, rng, params)) *
-            dot(normal, incoming);
+        auto test = fresnel_schlick(color_texture, normal, ray.o);
+        if (rand1f(rng) <
+            fresnel_schlick(color_texture, normal, ray.o).x) {  // matte
+          auto incoming = sample_hemisphere_cos(normal, rand2f(rng));
+          radiance += color_texture *
+                      rgba_to_rgb(shade_raytrace(scene, bvh,
+                          ray3f{position, incoming}, bounce + 1, rng, params));
+        } else {
+          auto incoming = reflect(ray.o, normal);
+          radiance += rgba_to_rgb(shade_raytrace(
+              scene, bvh, ray3f{position, incoming}, bounce + 1, rng, params));
+        }
         break;
       }
       case material_type::transparent: {  // polished dielectrics
