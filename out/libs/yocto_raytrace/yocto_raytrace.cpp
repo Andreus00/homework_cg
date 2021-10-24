@@ -91,26 +91,29 @@ static vec4f shade_raytrace(const scene_data& scene, const bvh_scene& bvh,
     //
 
     // color
+
+    vec3f color = material.color;
+
     auto color_texture = eval_texture(
         scene, material.color_tex, textcoord, true);
 
-    vec3f color = material.color;
     color *= rgba_to_rgb(color_texture);
 
     // normal
-    color_texture *= eval_texture(scene, material.normal_tex, textcoord, true);
+    color *= rgba_to_rgb(
+        eval_texture(scene, material.normal_tex, textcoord, true));
 
     // emission
-    color_texture *= eval_texture(
-        scene, material.emission_tex, textcoord, true);
+    color *= rgba_to_rgb(
+        eval_texture(scene, material.emission_tex, textcoord, true));
 
     // roughness
-    color_texture *= eval_texture(
-        scene, material.roughness_tex, textcoord, true);
+    color *= rgba_to_rgb(
+        eval_texture(scene, material.roughness_tex, textcoord, true));
 
     // scattering
-    color_texture *= eval_texture(
-        scene, material.scattering_tex, textcoord, true);
+    color *= rgba_to_rgb(
+        eval_texture(scene, material.scattering_tex, textcoord, true));
 
     //////////////////////////
     //
@@ -120,16 +123,6 @@ static vec4f shade_raytrace(const scene_data& scene, const bvh_scene& bvh,
     if (rand1f(rng) < (1 - material.opacity * color_texture.w * color_shp.w)) {
       return shade_raytrace(
           scene, bvh, ray3f{position, ray.d}, bounce + 1, rng, params);
-    }
-
-    // handle points, lines and triangles
-
-    if (!shape.points.empty()) {
-      normal = -ray.d;
-    } else if (!shape.lines.empty()) {
-      normal = orthonormalize(-ray.d, normal);
-    } else if (shape.triangles.empty()) {
-      if (dot(-ray.d, normal) < 0) normal = -normal;
     }
 
     //////////////////////////
@@ -142,6 +135,17 @@ static vec4f shade_raytrace(const scene_data& scene, const bvh_scene& bvh,
 
     auto radiance = material.emission;
     if (bounce >= params.bounces) return rgb_to_rgba(radiance);
+
+    // handle points, lines and triangles
+
+    if (!shape.points.empty()) {
+      normal = -ray.d;
+    } else if (!shape.lines.empty()) {
+      normal = orthonormalize(-ray.d, normal);
+    } else if (!shape.triangles.empty()) {
+      if (dot(-ray.d, normal) < 0) normal = -normal;
+    }
+
     switch (material.type) {
       case material_type::matte: {  // diffuse
         auto incoming = sample_hemisphere_cos(normal, rand2f(rng));
@@ -185,7 +189,7 @@ static vec4f shade_raytrace(const scene_data& scene, const bvh_scene& bvh,
         break;
       }
       case material_type::transparent: {  // polished dielectrics
-        auto test = fresnel_schlick({0.04, 0.04, 0.04}, normal, ray.d);
+        auto test = fresnel_schlick({0.04, 0.04, 0.04}, normal, -outgoing);
         if (rand1f(rng) < test.x) {
           auto incoming = reflect(outgoing, normal);
           radiance += rgba_to_rgb(shade_raytrace(
@@ -193,20 +197,20 @@ static vec4f shade_raytrace(const scene_data& scene, const bvh_scene& bvh,
         } else {
           radiance += color *
                       rgba_to_rgb(shade_raytrace(scene, bvh,
-                          ray3f{position, ray.d}, bounce + 1, rng, params));
+                          ray3f{position, -outgoing}, bounce + 1, rng, params));
         }
         break;
       }
       case material_type::refractive: {  // refraction
-        auto test = fresnel_schlick({0.04, 0.04, 0.04}, normal, ray.d);
+        auto test = fresnel_schlick({0.04, 0.04, 0.04}, normal, -outgoing);
         if (false && rand1f(rng) < test.x) {
-          auto incoming = reflect(-ray.d, normal);
+          auto incoming = reflect(outgoing, normal);
           radiance += rgba_to_rgb(shade_raytrace(
               scene, bvh, ray3f{position, incoming}, bounce + 1, rng, params));
         } else {
           // calcolo il raggio rifratto
           auto newray = ray3f{
-              position, refract(ray.d, normal, 1 / material.ior)};
+              position, refract(-outgoing, normal, 1 / material.ior)};
 
           // calcolo il punto e la normale in cui il raggio rifratto esce
           // dall'oggetto
