@@ -76,6 +76,7 @@ enum struct raytrace_shader_type {
   normal,    // normals
   texcoord,  // texcoords
   color,     // colors
+  toon,
 };
 
 // Options for trace functions
@@ -92,7 +93,7 @@ struct raytrace_params {
 };
 
 const auto raytrace_shader_names = vector<string>{
-    "raytrace", "matte", "eyelight", "normal", "texcoord", "color"};
+    "raytrace", "matte", "eyelight", "normal", "texcoord", "color", "toon"};
 
 // Initialize state.
 raytrace_state make_state(

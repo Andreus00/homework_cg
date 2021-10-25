@@ -49,7 +49,7 @@ static ray3f eval_camera(const camera_data& camera, const vec2f& uv) {
                   ? vec2f{camera.film, camera.film / camera.aspect}
                   : vec2f{camera.film * camera.aspect, camera.film};
   auto q    = transform_point(camera.frame,
-         {film.x * (0.5f - uv.x), film.y * (uv.y - 0.5f), camera.lens});
+      {film.x * (0.5f - uv.x), film.y * (uv.y - 0.5f), camera.lens});
   auto e    = transform_point(camera.frame, {0, 0, 0});
   return {e, normalize(e - q)};
 }
@@ -165,7 +165,7 @@ static vec4f shade_raytrace(const scene_data& scene, const bvh_scene& bvh,
           } else {  // rough metals
             auto exponent = 2 / pow((float)material.roughness, (int)4);
             auto halfway  = sample_hemisphere_cospower(
-                 exponent, normal, rand2f(rng));
+                exponent, normal, rand2f(rng));
             auto incoming = reflect(outgoing, halfway);
             radiance +=
                 fresnel_schlick(color, halfway, outgoing) *
@@ -177,7 +177,7 @@ static vec4f shade_raytrace(const scene_data& scene, const bvh_scene& bvh,
         case material_type::glossy: {  // rough plastic
           auto exponent = 2 / pow((float)material.roughness, (int)4);
           auto halfway  = sample_hemisphere_cospower(
-               exponent, normal, rand2f(rng));
+              exponent, normal, rand2f(rng));
           if (rand1f(rng) <
               fresnel_schlick({0.04, 0.04, 0.04}, halfway, outgoing).x) {
             auto incoming = reflect(outgoing, halfway);
@@ -241,6 +241,42 @@ static vec4f shade_raytrace(const scene_data& scene, const bvh_scene& bvh,
   return rgb_to_rgba(eval_environment(scene, ray.d));
 }
 
+static vec4f shade_toon(const scene_data& scene, const bvh_scene& bvh,
+    const ray3f& ray, int bounce, rng_state& rng,
+    const raytrace_params& params) {
+  // YOUR CODE GOES HERE ----
+  auto isec = intersect_bvh(bvh, scene, ray);
+  if (isec.hit) {
+    auto& scene_instance = scene.instances[isec.instance];
+    auto& scene_shape    = scene.shapes[scene_instance.shape];
+    auto  normal         = transform_direction(
+        scene_instance.frame, eval_normal(scene_shape, isec.element, isec.uv));
+
+    auto position = transform_point(scene_instance.frame,
+        eval_position(scene_shape, isec.element, isec.uv));
+
+    auto& material = scene.materials[scene_instance.material];
+    auto  x        = 1.0f;
+    for (auto& el : scene.instances) {
+      auto& mat = scene.materials[el.material];
+      if (mat.emission[0] > 0 || mat.emission[1] > 0 || mat.emission[2] > 0) {
+        auto  frame        = el.frame;
+        vec3f light_origin = {frame.x[0] * frame.o[0], frame.x[1] * frame.o[1],
+            frame.x[2] * frame.o[2]};
+        x                  = max((float)x, (float)dot(light_origin, position));
+      }
+    }
+
+    if (x > 0.1) {
+      return rgb_to_rgba(scene.materials[isec.instance].color);
+    }
+
+    return rgb_to_rgba(scene.materials[isec.instance].color) * 0.5;
+  }
+
+  return {0, 0, 0, 0};
+}
+
 // Matte renderer.
 static vec4f shade_matte(const scene_data& scene, const bvh_scene& bvh,
     const ray3f& ray, int bounce, rng_state& rng,
@@ -260,7 +296,7 @@ static vec4f shade_eyelight(const scene_data& scene, const bvh_scene& bvh,
     auto& material = scene.materials[instance.material];
     auto& shape    = scene.shapes[instance.shape];
     auto  normal   = transform_direction(
-           instance.frame, eval_normal(shape, isec.element, isec.uv));
+        instance.frame, eval_normal(shape, isec.element, isec.uv));
     return rgb_to_rgba(material.color * dot(normal, -ray.d));
   }
   return {0, 0, 0, 0};
@@ -275,7 +311,7 @@ static vec4f shade_normal(const scene_data& scene, const bvh_scene& bvh,
     auto& scene_instance = scene.instances[isec.instance];
     auto& scene_shape    = scene.shapes[scene_instance.shape];
     auto  normal         = transform_direction(
-                 scene_instance.frame, eval_normal(scene_shape, isec.element, isec.uv));
+        scene_instance.frame, eval_normal(scene_shape, isec.element, isec.uv));
 
     return rgb_to_rgba(0.5 + (normal * 0.5));
   }
@@ -320,6 +356,7 @@ static raytrace_shader_func get_shader(const raytrace_params& params) {
     case raytrace_shader_type::normal: return shade_normal;
     case raytrace_shader_type::texcoord: return shade_texcoord;
     case raytrace_shader_type::color: return shade_color;
+    case raytrace_shader_type::toon: return shade_toon;
     default: {
       throw std::runtime_error("sampler unknown");
       return nullptr;
