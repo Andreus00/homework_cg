@@ -146,96 +146,95 @@ static vec4f shade_raytrace(const scene_data& scene, const bvh_scene& bvh,
       if (dot(-ray.d, normal) < 0) normal = -normal;
     }
 
-    switch (material.type) {
-      case material_type::matte: {  // diffuse
-        auto incoming = sample_hemisphere_cos(normal, rand2f(rng));
-        radiance += color *
-                    rgba_to_rgb(shade_raytrace(scene, bvh,
-                        ray3f{position, incoming}, bounce + 1, rng, params));
-        break;
-      }
-      case (material_type::reflective): {
-        if ((material.roughness <= 0)) {  // polished metals
-          auto incoming = reflect(outgoing, normal);
-          radiance += fresnel_schlick(color, normal, outgoing) *
-                      rgba_to_rgb(shade_raytrace(scene, bvh,
-                          ray3f{position, incoming}, bounce + 1, rng, params));
-        } else {  // rough metals
-          auto exponent = 2 / pow((float)material.roughness, (int)4);
-          auto halfway  = sample_hemisphere_cospower(
-               exponent, normal, rand2f(rng));
-          auto incoming = reflect(outgoing, halfway);
-          radiance += fresnel_schlick(color, halfway, outgoing) *
-                      rgba_to_rgb(shade_raytrace(scene, bvh,
-                          ray3f{position, incoming}, bounce + 1, rng, params));
-        }
-        break;
-      }
-      case material_type::glossy: {  // rough plastic
-        auto exponent = 2 / pow((float)material.roughness, (int)4);
-        auto halfway  = sample_hemisphere_cospower(
-             exponent, normal, rand2f(rng));
-        if (rand1f(rng) <
-            fresnel_schlick({0.04, 0.04, 0.04}, halfway, outgoing).x) {
-          auto incoming = reflect(outgoing, halfway);
-          radiance += rgba_to_rgb(shade_raytrace(
-              scene, bvh, ray3f{position, incoming}, bounce + 1, rng, params));
-        } else {
+    try {
+      switch (material.type) {
+        case material_type::matte: {  // diffuse
           auto incoming = sample_hemisphere_cos(normal, rand2f(rng));
           radiance += color *
                       rgba_to_rgb(shade_raytrace(scene, bvh,
                           ray3f{position, incoming}, bounce + 1, rng, params));
+          break;
         }
-        break;
-      }
-      case material_type::transparent: {  // polished dielectrics
-        auto test = fresnel_schlick({0.04, 0.04, 0.04}, normal, -outgoing);
-        if (rand1f(rng) < test.x) {
-          auto incoming = reflect(outgoing, normal);
-          radiance += rgba_to_rgb(shade_raytrace(
-              scene, bvh, ray3f{position, incoming}, bounce + 1, rng, params));
-        } else {
-          radiance += color *
-                      rgba_to_rgb(shade_raytrace(scene, bvh,
-                          ray3f{position, -outgoing}, bounce + 1, rng, params));
+        case (material_type::reflective): {
+          if ((material.roughness <= 0)) {  // polished metals
+            auto incoming = reflect(outgoing, normal);
+            radiance +=
+                fresnel_schlick(color, normal, outgoing) *
+                rgba_to_rgb(shade_raytrace(scene, bvh,
+                    ray3f{position, incoming}, bounce + 1, rng, params));
+          } else {  // rough metals
+            auto exponent = 2 / pow((float)material.roughness, (int)4);
+            auto halfway  = sample_hemisphere_cospower(
+                 exponent, normal, rand2f(rng));
+            auto incoming = reflect(outgoing, halfway);
+            radiance +=
+                fresnel_schlick(color, halfway, outgoing) *
+                rgba_to_rgb(shade_raytrace(scene, bvh,
+                    ray3f{position, incoming}, bounce + 1, rng, params));
+          }
+          break;
         }
-        break;
-      }
-      case material_type::refractive: {  // refraction
-        auto test = fresnel_schlick({0.04, 0.04, 0.04}, normal, -outgoing);
-        if (false && rand1f(rng) < test.x) {
-          auto incoming = reflect(outgoing, normal);
-          radiance += rgba_to_rgb(shade_raytrace(
-              scene, bvh, ray3f{position, incoming}, bounce + 1, rng, params));
-        } else {
-          // calcolo il raggio rifratto
-          auto newray = ray3f{
-              position, refract(outgoing, normal, 1 / material.ior)};
-
-          // calcolo il punto e la normale in cui il raggio rifratto esce
-          // dall'oggetto
-          isec     = intersect_bvh(bvh, scene, newray);
-          position = transform_point(
-              instance.frame, eval_position(shape, isec.element, isec.uv));
-          normal = transform_direction(
-              instance.frame, eval_normal(shape, isec.element, isec.uv));
-
-          // calcolo la rifrazione del raggio in uscita
-          newray = ray3f{position, refract(-newray.d, -normal, material.ior)};
-
-          // continuo la ricorsione dal punto da cui esce il raggio nella
-          // direzione in cui viene refratto all'uscita
-          radiance += color * rgba_to_rgb(shade_raytrace(
-                                  scene, bvh, newray, bounce + 2, rng, params));
-
-          std::cout << "out " << ray.o.x << " " << newray.d.x << " "
-                    << newray.d.y << " " << newray.d.z << std::endl;
+        case material_type::glossy: {  // rough plastic
+          auto exponent = 2 / pow((float)material.roughness, (int)4);
+          auto halfway  = sample_hemisphere_cospower(
+               exponent, normal, rand2f(rng));
+          if (rand1f(rng) <
+              fresnel_schlick({0.04, 0.04, 0.04}, halfway, outgoing).x) {
+            auto incoming = reflect(outgoing, halfway);
+            radiance += rgba_to_rgb(shade_raytrace(scene, bvh,
+                ray3f{position, incoming}, bounce + 1, rng, params));
+          } else {
+            auto incoming = sample_hemisphere_cos(normal, rand2f(rng));
+            radiance += color * rgba_to_rgb(shade_raytrace(scene, bvh,
+                                    ray3f{position, incoming}, bounce + 1, rng,
+                                    params));
+          }
+          break;
         }
-        break;
+        case material_type::transparent: {  // polished dielectrics
+          auto test = fresnel_schlick({0.04, 0.04, 0.04}, normal, -outgoing);
+          if (rand1f(rng) < test.x) {
+            auto incoming = reflect(outgoing, normal);
+            radiance += rgba_to_rgb(shade_raytrace(scene, bvh,
+                ray3f{position, incoming}, bounce + 1, rng, params));
+          } else {
+            radiance += color * rgba_to_rgb(shade_raytrace(scene, bvh,
+                                    ray3f{position, -outgoing}, bounce + 1, rng,
+                                    params));
+          }
+          break;
+        }
+        case material_type::refractive: {  // refraction
+          auto test = fresnel_schlick({0.04, 0.04, 0.04}, normal, -outgoing);
+          if (false && rand1f(rng) < test.x) {
+            auto incoming = reflect(outgoing, normal);
+            radiance += rgba_to_rgb(shade_raytrace(scene, bvh,
+                ray3f{position, incoming}, bounce + 1, rng, params));
+          } else {
+            // calcolo il raggio rifratto
+            auto ior = max(1.0f, (float)material.ior);
+
+            if (dot(ray.d, normal) > 0) {
+              normal = -normal;
+            } else {
+              ior = 1 / ior;
+            }
+
+            radiance += color *
+                        rgba_to_rgb(shade_raytrace(scene, bvh,
+                            ray3f{position, refract(outgoing, normal, ior)},
+                            bounce + 1, rng, params));
+          }
+          break;
+        }
+        default: {
+          std::cout << material_type_names[(int)material.type] << std::endl;
+        }
       }
-      default: {
-        std::cout << material_type_names[(int)material.type] << std::endl;
-      }
+    } catch (...) {
+      std::cout << "dddddddd" << std::endl;
+      std::exception_ptr p = std::current_exception();
+      std::clog << (p ? p.__cxa_exception_type()->name() : "null") << std::endl;
     }
     return rgb_to_rgba(radiance);
   }
