@@ -210,7 +210,7 @@ static vec4f shade_raytrace(const scene_data& scene, const bvh_scene& bvh,
         } else {
           // calcolo il raggio rifratto
           auto newray = ray3f{
-              position, refract(-outgoing, normal, 1 / material.ior)};
+              position, refract(outgoing, normal, 1 / material.ior)};
 
           // calcolo il punto e la normale in cui il raggio rifratto esce
           // dall'oggetto
@@ -221,15 +221,15 @@ static vec4f shade_raytrace(const scene_data& scene, const bvh_scene& bvh,
               instance.frame, eval_normal(shape, isec.element, isec.uv));
 
           // calcolo la rifrazione del raggio in uscita
-          newray = ray3f{position, refract(newray.d, normal, material.ior)};
+          newray = ray3f{position, refract(-newray.d, -normal, material.ior)};
 
           // continuo la ricorsione dal punto da cui esce il raggio nella
           // direzione in cui viene refratto all'uscita
           radiance += color * rgba_to_rgb(shade_raytrace(
                                   scene, bvh, newray, bounce + 2, rng, params));
 
-          // std::cout << "out " << ray.o.x << "" << newray.d.x << newray.d.y
-          //           << newray.d.z << std::endl;
+          std::cout << "out " << ray.o.x << " " << newray.d.x << " "
+                    << newray.d.y << " " << newray.d.z << std::endl;
         }
         break;
       }
