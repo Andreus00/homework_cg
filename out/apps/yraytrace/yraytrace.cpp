@@ -170,7 +170,7 @@ void run_interactive(const string& filename, const string& output,
           render_update = true;
         }
       }
-    });
+     });
   };
 
   // stop render
@@ -247,12 +247,12 @@ void run_interactive(const string& filename, const string& output,
       auto pan    = zero2f;
       auto rotate = zero2f;
       if (input.modifier_shift) {
-        pan   = (input.mouse_pos - input.mouse_last) * camera.focus / 200.0f;
+        pan = (input.mouse_pos - input.mouse_last) * camera.focus / 2000000.0f;
         pan.x = -pan.x;
       } else if (input.modifier_ctrl) {
-        dolly = (input.mouse_pos.y - input.mouse_last.y) / 100.0f;
+        dolly = (input.mouse_pos.y - input.mouse_last.y) / 1000000.0f;
       } else {
-        rotate = (input.mouse_pos - input.mouse_last) / 100.0f;
+        rotate = (input.mouse_pos - input.mouse_last) / 1000000.0f;
       }
       auto [frame, focus] = camera_turntable(
           camera.frame, camera.focus, rotate, dolly, pan);

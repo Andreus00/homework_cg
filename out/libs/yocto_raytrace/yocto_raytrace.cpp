@@ -160,7 +160,6 @@ static vec4f shade_raytrace(const scene_data& scene, const bvh_scene& bvh,
           radiance += fresnel_schlick(color, normal, outgoing) *
                       rgba_to_rgb(shade_raytrace(scene, bvh,
                           ray3f{position, incoming}, bounce + 1, rng, params));
-<<<<<<< HEAD
         } else {  // rough metals
           auto exponent = 2 / pow((float)material.roughness, (int)4);
           auto halfway  = sample_hemisphere_cospower(
@@ -169,45 +168,6 @@ static vec4f shade_raytrace(const scene_data& scene, const bvh_scene& bvh,
           radiance += fresnel_schlick(color, halfway, outgoing) *
                       rgba_to_rgb(shade_raytrace(scene, bvh,
                           ray3f{position, incoming}, bounce + 1, rng, params));
-=======
-          break;
-        }
-        case (material_type::reflective): {
-          if ((material.roughness <= 0)) {  // polished metals
-            auto incoming = reflect(outgoing, normal);
-            radiance +=
-                fresnel_schlick(color, normal, outgoing) *
-                rgba_to_rgb(shade_raytrace(scene, bvh,
-                    ray3f{position, incoming}, bounce + 1, rng, params));
-          } else {  // rough metals
-            auto exponent = 2 / pow((float)material.roughness, (int)4);
-            auto halfway = sample_hemisphere_cospower(
-                exponent, normal, rand2f(rng));
-            auto incoming = reflect(outgoing, halfway);
-            radiance +=
-                fresnel_schlick(color, halfway, outgoing) *
-                rgba_to_rgb(shade_raytrace(scene, bvh,
-                    ray3f{position, incoming}, bounce + 1, rng, params));
-          }
-          break;
-        }
-        case material_type::glossy: {  // rough plastic
-          auto exponent = 2 / pow((float)material.roughness, (int)4);
-          auto halfway = sample_hemisphere_cospower(
-              exponent, normal, rand2f(rng));
-          if (rand1f(rng) <
-              fresnel_schlick({0.04, 0.04, 0.04}, halfway, outgoing).x) {
-            auto incoming = reflect(outgoing, halfway);
-            radiance += rgba_to_rgb(shade_raytrace(scene, bvh,
-                ray3f{position, incoming}, bounce + 1, rng, params));
-          } else {
-            auto incoming = sample_hemisphere_cos(normal, rand2f(rng));
-            radiance += color * rgba_to_rgb(shade_raytrace(scene, bvh,
-                                    ray3f{position, incoming}, bounce + 1, rng,
-                                    params));
-          }
-          break;
->>>>>>> 78905feb7a81c23f7e15cf9ddfb73ec9f471cf9d
         }
         break;
       }
@@ -282,30 +242,56 @@ static vec4f shade_toon(const scene_data& scene, const bvh_scene& bvh,
     auto& scene_shape    = scene.shapes[scene_instance.shape];
     auto  normal         = transform_direction(
                  scene_instance.frame, eval_normal(scene_shape, isec.element, isec.uv));
-
-    auto position = transform_point(scene_instance.frame,
-        eval_position(scene_shape, isec.element, isec.uv));
-
     auto& material = scene.materials[scene_instance.material];
-    auto  x        = 1.0f;
+    auto  color    = material.color;
+
     for (auto& el : scene.instances) {
-      auto& mat = scene.materials[el.material];
-      if (mat.emission[0] > 0 || mat.emission[1] > 0 || mat.emission[2] > 0) {
-        auto  frame        = el.frame;
-        vec3f light_origin = {frame.x[0] * frame.o[0], frame.x[1] * frame.o[1],
-            frame.x[2] * frame.o[2]};
-        x                  = max((float)x, (float)dot(light_origin, position));
+      auto emission = scene.materials.at(el.material).emission;
+      std::cout << emission.x << std::endl;
+      if (emission.x != 0 || emission.y != 0 || emission.z != 0) {
+        // get the position of the object
+        auto pos = normalize(
+            (el.frame.x + el.frame.y + el.frame.z) * el.frame.o);
+        std::cout << pos.x << std::endl;
+
+        color *= dot(pos, normal) * emission;
       }
     }
-
-    if (x > 0.1) {
-      return rgb_to_rgba(scene.materials[isec.instance].color);
-    }
-
-    return rgb_to_rgba(scene.materials[isec.instance].color) * 0.5;
+    return rgb_to_rgba(color);
   }
+  return rgb_to_rgba(eval_environment(scene, ray.d));
+}
 
-  return {0, 0, 0, 0};
+static vec4f easy_shade_toon(const scene_data& scene, const bvh_scene& bvh,
+    const ray3f& ray, int bounce, rng_state& rng,
+    const raytrace_params& params) {
+  // YOUR CODE GOES HERE ----
+  auto isec = intersect_bvh(bvh, scene, ray);
+  if (isec.hit) {
+    auto& scene_instance = scene.instances[isec.instance];
+    auto& scene_shape    = scene.shapes[scene_instance.shape];
+    auto  normal         = transform_direction(
+                 scene_instance.frame, eval_normal(scene_shape, isec.element, isec.uv));
+    auto& material = scene.materials[scene_instance.material];
+
+    auto  a     = dot(normal, ray.o);
+    auto& shape = scene.shapes[scene_instance.shape];
+
+    auto rg        = eval_texcoord(shape, isec.element, isec.uv);
+    auto textcoord = vec2f{fmod(rg.x, 1), fmod(rg.y, 1)};
+
+    vec3f color = material.color;
+
+    auto color_texture = eval_texture(
+        scene, material.color_tex, textcoord, true);
+
+    color *= rgba_to_rgb(color_texture);
+    if (a > 0.3) {
+      return rgb_to_rgba(color);
+    } else {
+      return rgb_to_rgba(color * 0.1);
+    }
+  }
 }
 
 // Matte renderer.
