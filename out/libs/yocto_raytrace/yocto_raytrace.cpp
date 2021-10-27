@@ -242,22 +242,67 @@ static vec4f shade_toon(const scene_data& scene, const bvh_scene& bvh,
     auto& scene_shape    = scene.shapes[scene_instance.shape];
     auto  normal         = transform_direction(
                  scene_instance.frame, eval_normal(scene_shape, isec.element, isec.uv));
-    auto& material = scene.materials[scene_instance.material];
-    auto  color    = material.color;
+    // position
+    auto position = transform_point(scene_instance.frame,
+        eval_position(scene_shape, isec.element, isec.uv));
 
+    auto& material = scene.materials[scene_instance.material];
+
+    // texture coordinates
+    auto  rg           = eval_texcoord(scene_shape, isec.element, isec.uv);
+    auto  textcoord    = vec2f{fmod(rg.x, 1), fmod(rg.y, 1)};
+    auto  color        = material.color * rgba_to_rgb(eval_texture(scene,
+                                              material.color_tex, textcoord, true));
+    vec3f illumination = zero3f;
+    // contatore del numero di luci che colpiscono il punto
+    int counter = 0;
+    // itero sulle luci e vedo se il dot product tra la normale del punto
+    // colpito e il punto in cui is trova la luce.
     for (auto& el : scene.instances) {
       auto emission = scene.materials.at(el.material).emission;
-      std::cout << emission.x << std::endl;
       if (emission.x != 0 || emission.y != 0 || emission.z != 0) {
-        // get the position of the object
+        // posizione della luce
         auto pos = normalize(
             (el.frame.x + el.frame.y + el.frame.z) * el.frame.o);
-        std::cout << pos.x << std::endl;
-
-        color *= dot(pos, normal) * emission;
+        // check per vedere se ci sono ogetti tra la luce e il punto
+        // todo
+        float       cosin           = dot(pos, normal);
+        const float smooth_bound    = 0.3;
+        auto        light_intensity = (1 - 1 / emission);
+        if (cosin > 0) {
+          illumination += light_intensity;
+          counter++;
+        }
       }
     }
-    return rgb_to_rgba(color);
+
+    float rim_dot       = 1 - dot(-ray.d, normal);
+    float rim_intensity = smoothstep(0.7f - 0.01f, 0.7f + 0.01f, rim_dot);
+
+    illumination += rim_intensity;
+
+    // add the light reflection
+    auto outgoing = reflect(-ray.d, normal);
+
+    auto isec = intersect_bvh(bvh, scene, ray3f{position, outgoing});
+    if (isec.hit) {
+      auto& ins = scene.instances[isec.instance];
+      auto& mat = scene.materials.at(ins.material);
+      if (mat.emission.x != 0 || mat.emission.y != 0 || mat.emission.z != 0) {
+        illumination += (1 - 1 / mat.emission);
+      }
+    }
+    // if the point is not hitted by a light, I reduce the signal of the colors
+    if (counter == 0) {
+      color *= 0.25;
+    }
+
+    // add the color of the environment
+    auto env_emission = vec3f{1, 1, 1};
+    for (auto& env : scene.environments) {
+      illumination += env.emission;
+    }
+    return rgb_to_rgba(color * illumination);
   }
   return rgb_to_rgba(eval_environment(scene, ray.d));
 }
