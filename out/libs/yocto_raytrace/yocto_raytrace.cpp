@@ -203,12 +203,12 @@ static vec4f shade_raytrace(const scene_data& scene, const bvh_scene& bvh,
       }
       case material_type::refractive: {  // refraction
         auto test = fresnel_schlick({0.04, 0.04, 0.04}, normal, -outgoing);
-        if (false && rand1f(rng) < test.x) {
+        if (rand1f(rng) < test.x) {
           auto incoming = reflect(outgoing, normal);
           radiance += rgba_to_rgb(shade_raytrace(
               scene, bvh, ray3f{position, incoming}, bounce + 1, rng, params));
         } else {
-          auto ior = max(1.0f, (float)material.ior);
+          auto ior = material.ior;
 
           if (dot(ray.d, normal) > 0) {
             normal = -normal;
@@ -247,6 +247,12 @@ static vec4f shade_toon(const scene_data& scene, const bvh_scene& bvh,
         eval_position(scene_shape, isec.element, isec.uv));
 
     auto& material = scene.materials[scene_instance.material];
+    if (material.type == material_type::reflective) {
+      auto incoming = reflect(-ray.d, normal);
+      return rgb_to_rgba(fresnel_schlick(material.color, normal, -ray.d)) *
+             shade_toon(scene, bvh, ray3f{position, incoming}, bounce + 1, rng,
+                 params);
+    }
 
     // texture coordinates
     auto  rg           = eval_texcoord(scene_shape, isec.element, isec.uv);
@@ -258,28 +264,32 @@ static vec4f shade_toon(const scene_data& scene, const bvh_scene& bvh,
     int counter = 0;
     // itero sulle luci e vedo se il dot product tra la normale del punto
     // colpito e il punto in cui is trova la luce.
+    auto test_rim = 0;
     for (auto& el : scene.instances) {
       auto emission = scene.materials.at(el.material).emission;
       if (emission.x != 0 || emission.y != 0 || emission.z != 0) {
         // posizione della luce
         auto pos = normalize(
             (el.frame.x + el.frame.y + el.frame.z) * el.frame.o);
+        // vettore che dal punto va verso la luce
+        auto light_vector = normalize(pos - position);
+
         // check per vedere se ci sono ogetti tra la luce e il punto
         // todo
-        float       cosin           = dot(pos, normal);
-        const float smooth_bound    = 0.3;
-        auto        light_intensity = (1 - 1 / emission);
+        float cosin           = dot(light_vector, normal);
+        auto  light_intensity = (1 - 1 / emission);
         if (cosin > 0) {
           illumination += light_intensity;
           counter++;
         }
       }
     }
+    if (scene.instance_names.at(isec.instance) != "floor") {
+      float rim_dot       = 1 - dot(-ray.d, normal);
+      float rim_intensity = smoothstep(0.7f - 0.01f, 0.7f + 0.01f, rim_dot);
 
-    float rim_dot       = 1 - dot(-ray.d, normal);
-    float rim_intensity = smoothstep(0.7f - 0.01f, 0.7f + 0.01f, rim_dot);
-
-    illumination += rim_intensity;
+      illumination += rim_intensity;
+    }
 
     // add the light reflection
     auto outgoing = reflect(-ray.d, normal);
@@ -293,9 +303,6 @@ static vec4f shade_toon(const scene_data& scene, const bvh_scene& bvh,
       }
     }
     // if the point is not hitted by a light, I reduce the signal of the colors
-    if (counter == 0) {
-      color *= 0.25;
-    }
 
     // add the color of the environment
     auto env_emission = vec3f{1, 1, 1};
