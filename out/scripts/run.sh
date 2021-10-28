@@ -4,11 +4,13 @@
 # ./bin/yraytrace --scene tests/02_matte/matte.json --output out/lowres/0x_eyelight_720_9.jpg --samples 9 --shader eyelight --resolution 720
 
 # ./bin/yraytrace --scene tests/01_cornellbox/cornellbox.json --output out/lowres/01_cornellbox_512_256.jpg --samples 256 --resolution 512
+./bin/yraytrace --interactive --scene tests/01_cornellbox_volumetric/cornellbox.json --output out/lowres/01_cornellbox_512_256.jpg --samples 256 --resolution 512
 # ./bin/yraytrace --scene tests/02_matte/matte.json --output out/lowres/02_matte_720_256.jpg --samples 256 --resolution 720
 # ./bin/yraytrace --scene tests/03_texture/texture.json --output out/lowres/03_texture_720_256.jpg --samples 256 --resolution 720
 
 # ./bin/yraytrace --interactive --scene tests/04_envlight/envlight.json --output out/lowres/04_envlight_720_256.jpg --samples 256 --resolution 720
-./bin/yraytrace --interactive --scene tests/05_arealight/arealight.json --output out/lowres/05_arealight_720_256.jpg --samples 256 --resolution 720
+# ./bin/yraytrace --interactive --scene tests/05_arealight/arealight.json --output out/lowres/05_arealight_720_256.jpg --samples 256 --resolution 720
+# ./bin/yraytrace --interactive --scene tests/05_arealight_vol/arealight.json --output out/lowres/05_arealight_720_256.jpg --samples 256 --resolution 720
 # ./bin/yraytrace --interactive --scene tests/06_metal/metal.json --output out/lowres/06_metal_720_256.jpg --samples 256 --resolution 720
 # ./bin/yraytrace --interactive --scene tests/07_plastic/plastic.json --output out/lowres/07_plastic_720_256.jpg --samples 256 --resolution 720
 # ./bin/yraytrace --scene tests/08_glass/glass.json --output out/lowres/08_glass_720_256.jpg --samples 256 --bounces  8 --resolution 720

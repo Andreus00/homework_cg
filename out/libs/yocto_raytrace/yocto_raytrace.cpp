@@ -41,6 +41,9 @@
 // IMPLEMENTATION FOR SCENE EVALUATION
 // -----------------------------------------------------------------------------
 namespace yocto {
+static vec4f shade_raytrace(const scene_data& scene, const bvh_scene& bvh,
+    const ray3f& ray, int bounce, rng_state& rng,
+    const raytrace_params& params);
 
 // Generates a ray from a camera for yimg::image plane coordinate uv and
 // the lens coordinates luv.
@@ -58,6 +61,48 @@ static ray3f eval_camera(const camera_data& camera, const vec2f& uv) {
 // IMPLEMENTATION FOR PATH TRACING
 // -----------------------------------------------------------------------------
 
+// volumetric function
+
+vec3f volumetric_recursion(const scene_data& scene, const bvh_scene& bvh,
+    const ray3f& ray, int bounce, rng_state& rng, const raytrace_params& params,
+    const instance_data& instance, const material_data& material) {
+  if (bounce > params.bounces) {
+    return vec3f{0, 0, 0};
+  }
+  auto out_isec = intersect_bvh(bvh, scene, ray);
+  // se non c'è intersezione ritorno l'environment
+  if (!out_isec.hit) return eval_environment(scene, ray.d);
+  // prendo le informazioni sull'oggetto che è stato colpito per capire se
+  // il raggio sta uscendo dall'oggetto volumetric o no
+  auto& out_instance = scene.instances[out_isec.instance];
+  auto& out_material = scene.materials[out_instance.material];
+  auto& out_shape    = scene.shapes[out_instance.shape];
+  // position
+  auto out_position = transform_point(
+      instance.frame, eval_position(out_shape, out_isec.element, out_isec.uv));
+  // normal
+  auto out_normal = transform_direction(
+      instance.frame, eval_normal(out_shape, out_isec.element, out_isec.uv));
+  auto dist         = distance(out_position, ray.o);
+  auto hit_distance = (-1 / material.ior) * log(rand1f(rng));
+  // if (rand1f(rng) > 0.01) std::cout << dist << " " << hit_distance <<
+  // std::endl;
+  if (hit_distance > dist) {  // se non hitta faccio passare oltre il raggio
+    return material.color * rgba_to_rgb(shade_raytrace(scene, bvh,
+                                ray3f{ray.o, ray.d}, bounce, rng, params));
+  } else {
+    auto x = eval_transmittance(
+        vec3f{material.ior, material.ior, material.ior}, hit_distance);
+    auto rand_dir     = sample_sphere(rand2f(rng));
+    auto bounce_ratio = hit_distance / dist;
+    auto bounce_point = bounce_ratio * ray.o +
+                        (1 - bounce_ratio) * out_position;
+    return x + volumetric_recursion(scene, bvh, ray3f{bounce_point, rand_dir},
+                   bounce + 1, rng, params, instance, material);
+  }
+}
+
+////////////////////////
 // Raytrace renderer.
 static vec4f shade_raytrace(const scene_data& scene, const bvh_scene& bvh,
     const ray3f& ray, int bounce, rng_state& rng,
@@ -223,6 +268,12 @@ static vec4f shade_raytrace(const scene_data& scene, const bvh_scene& bvh,
         }
         break;
       }
+      case material_type::volumetric: {
+        // vedo vesro dove va il raggio
+        radiance += volumetric_recursion(scene, bvh, ray3f{position, ray.d},
+            bounce, rng, params, instance, material);
+        break;
+      }
       default: {
         std::cout << material_type_names[(int)material.type] << std::endl;
       }
@@ -250,8 +301,8 @@ static vec4f shade_toon(const scene_data& scene, const bvh_scene& bvh,
     if (material.type == material_type::reflective) {
       auto incoming = reflect(-ray.d, normal);
       return rgb_to_rgba(fresnel_schlick(material.color, normal, -ray.d)) *
-             shade_toon(scene, bvh, ray3f{position, incoming}, bounce + 1, rng,
-                 params);
+             shade_toon(
+                 scene, bvh, ray3f{position, incoming}, bounce, rng, params);
     }
 
     // texture coordinates
@@ -264,23 +315,46 @@ static vec4f shade_toon(const scene_data& scene, const bvh_scene& bvh,
     int counter = 0;
     // itero sulle luci e vedo se il dot product tra la normale del punto
     // colpito e il punto in cui is trova la luce.
-    auto test_rim = 0;
+    auto test_rim         = 0;
+    int  instance_counter = -1;
     for (auto& el : scene.instances) {
+      instance_counter++;
       auto emission = scene.materials.at(el.material).emission;
       if (emission.x != 0 || emission.y != 0 || emission.z != 0) {
         // posizione della luce
-        auto pos = normalize(
-            (el.frame.x + el.frame.y + el.frame.z) * el.frame.o);
-        // vettore che dal punto va verso la luce
-        auto light_vector = normalize(pos - position);
+        auto light_world_position = (el.frame.x + el.frame.y + el.frame.z) *
+                                    el.frame.o;
 
-        // check per vedere se ci sono ogetti tra la luce e il punto
-        // todo
-        float cosin           = dot(light_vector, normal);
-        auto  light_intensity = (1 - 1 / emission);
-        if (cosin > 0) {
-          illumination += light_intensity;
-          counter++;
+        auto check_isec = intersect_bvh(bvh, scene,
+            ray3f{position, normalize(light_world_position - position)});
+
+        float hit_distance = 0.0f;
+
+        if (check_isec.hit) {
+          auto& check_instance = scene.instances[check_isec.instance];
+          // position
+          auto check_position = (check_instance.frame.x +
+                                    check_instance.frame.y +
+                                    check_instance.frame.z) *
+                                check_instance.frame.o;
+          hit_distance = distance(check_position, position);
+        }
+
+        if (hit_distance >= distance(light_world_position, position) - 0.02) {
+          auto pos = normalize(light_world_position);
+          // vettore che dal punto va verso la luce
+          auto light_vector = normalize(pos - position);
+
+          // check per vedere se ci sono ogetti tra la luce e il punto
+          // todo
+          float cosin           = dot(light_vector, normal);
+          auto  light_intensity = (1 - 1 / emission);
+          if (cosin > 0) {
+            illumination += light_intensity;
+            counter++;
+          }
+        } else {
+          color *= 0.1;
         }
       }
     }

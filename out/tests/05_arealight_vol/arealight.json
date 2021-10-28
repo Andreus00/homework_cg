@@ -38,29 +38,11 @@
   ],
   "textures": [
     {
-      "name": "floor",
-      "uri": "textures/floor.png"
-    },
-    {
-      "name": "uvgrid",
-      "uri": "textures/uvgrid.png"
-    },
-    {
       "name": "sky",
       "uri": "textures/sky.hdr"
     }
   ],
   "materials": [
-    {
-      "name": "floor",
-      "color": [
-        0.5,
-        0.5,
-        0.5
-      ],
-      "color_tex": 0,
-      "type": "matte"
-    },
     {
       "name": "arealight1",
       "emission": [
@@ -80,60 +62,27 @@
       "type": "matte"
     },
     {
-      "name": "sphere",
-      "color": [
-        1,
-        1,
-        1
-      ],
-      "type": "volumetric",
-      "ior": 100
-    },
-    {
       "name": "teapot",
       "color": [
-        1,
-        1,
-        1
+        0.8,
+        0.8,
+        0.8
       ],
-      "type": "volumetric",
-      "ior": 2
+      "ior": 2,
+      "type": "volumetric"
     },
     {
       "name": "bunny",
       "color": [
-        1,
-        1,
-        1
+        0.3,
+        0.6,
+        0.3
       ],
-      "type": "volumetric",
-      "ior": 200
-    },
-    {
-      "name": "uvcylinder",
-      "color": [
-        1,
-        1,
-        1
-      ],
-      "type": "volumetric",
-      "ior": 2
-    },
-    {
-      "name": "cube",
-      "color": [
-        1,
-        1,
-        1
-      ],
-      "type": "matte"
+      "ior": 1,
+      "type": "volumetric"
     }
   ],
   "shapes": [
-    {
-      "name": "floor",
-      "uri": "shapes/floor.ply"
-    },
     {
       "name": "arealight1",
       "uri": "shapes/arealight1.ply"
@@ -164,11 +113,6 @@
     }
   ],
   "instances": [
-    {
-      "name": "floor",
-      "shape": 0,
-      "material": 0
-    },
     {
       "name": "arealight1",
       "shape": 1,
@@ -208,25 +152,6 @@
       "material": 2
     },
     {
-      "name": "sphere",
-      "shape": 3,
-      "frame": [
-        1,
-        0,
-        0,
-        0,
-        1,
-        0,
-        0,
-        0,
-        1,
-        -0.4,
-        0,
-        0
-      ],
-      "material": 3
-    },
-    {
       "name": "teapot",
       "shape": 4,
       "frame": [
@@ -263,44 +188,6 @@
         0
       ],
       "material": 5
-    },
-    {
-      "name": "uvcylinder",
-      "shape": 6,
-      "frame": [
-        1,
-        0,
-        0,
-        0,
-        1,
-        0,
-        0,
-        0,
-        1,
-        0.2,
-        0,
-        0
-      ],
-      "material": 6
-    },
-    {
-      "name": "cube",
-      "shape": 7,
-      "frame": [
-        1,
-        0,
-        0,
-        0,
-        1,
-        0,
-        0,
-        0,
-        1,
-        -0.2,
-        0,
-        0
-      ],
-      "material": 7
     }
   ]
 }
